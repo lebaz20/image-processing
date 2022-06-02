@@ -297,6 +297,93 @@ def reset_fourier():
     except:
         print("fourierPanel undefined")
 
+def init_salt_pepper():
+    global saltALabel
+    saltALabel = Label(root, text='Amount:')
+    saltALabel.grid(row = 23, column = 0, sticky="nsw")
+    global saltA
+    saltA = StringVar()
+    global saltAEntry
+    saltAEntry = Entry(root, textvariable=saltA)
+    saltAEntry.grid(row = 24, column = 0, sticky="nesw")
+
+    global saltSubmit
+    saltSubmit = Button(root, text =' Submit', anchor="w", command = salt_pepper)
+    saltSubmit.grid(row = 25, column = 0, sticky="nesw")
+
+def salt_pepper():
+    image = plt.imread(filename)
+    img_noise = random_noise(image, mode='s&p',amount=float(saltA.get()))
+    img_noise = np.array(255*img_noise, dtype = 'uint8')
+
+    plt.imshow(img_noise)
+    plt.axis('Off')
+    img_data = BytesIO()
+    plt.savefig(img_data, bbox_inches='tight', pad_inches=0)
+    reset_plt()
+    load = Image.open(img_data)
+    load = resize_img(load)
+    image_from_plot = ImageTk.PhotoImage(load)
+
+    global saltPanel
+    # create a label
+    saltPanel = Label(root, image = image_from_plot) 
+    # set the image as img
+    saltPanel.image = image_from_plot
+    saltPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+
+def reset_salt():
+    try:
+        saltALabel.grid_remove()
+        print("saltALabel removed")
+    except:
+        print("saltALabel undefined")
+    try:
+        saltAEntry.grid_remove()
+        print("saltAEntry removed")
+    except:
+        print("saltAEntry undefined")
+    try:
+        saltSubmit.grid_remove()
+        print("saltSubmit removed")
+    except:
+        print("saltSubmit undefined")
+    try:
+        saltPanel.grid_remove()
+        print("saltPanel removed")
+    except:
+        print("saltPanel undefined")
+
+def periodic():
+    image = cv2.imread(filename, flags=0)
+    shape = image.shape[0], image.shape[1]
+    x,y = np.meshgrid(range(0,shape[1]), range(0, shape[0]))
+    s= 1+np.sin(x+y/1.5)
+    img_noise= ((image) / 128 + s)/4
+
+    plt.imshow(img_noise, cmap="gray")
+    plt.axis('Off')
+    img_data = BytesIO()
+    plt.savefig(img_data, bbox_inches='tight', pad_inches=0)
+    reset_plt()
+    load = Image.open(img_data)
+    load = resize_img(load)
+    image_from_plot = ImageTk.PhotoImage(load)
+
+    global periodicPanel
+    # create a label
+    periodicPanel = Label(root, image = image_from_plot) 
+    # set the image as img
+    periodicPanel.image = image_from_plot
+    periodicPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+
+def reset_periodic():
+    try:
+        periodicPanel.grid_remove()
+        print("periodicPanel removed")
+    except:
+        print("periodicPanel undefined")
+
 def reset():
     try:
         panel1.grid_remove()
@@ -322,6 +409,8 @@ def reset():
     reset_sobel()
     reset_laplace()
     reset_fourier()
+    reset_salt()
+    reset_periodic()
 
 
 # Create a window
@@ -366,10 +455,10 @@ btn6.grid(row = 9, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 10)
 
-btn7 = Button(root, text =' Add Salt And Pepper Noise', anchor="w")
+btn7 = Button(root, text =' Add Salt And Pepper Noise', anchor="w", command = init_salt_pepper)
 btn7.grid(row = 11, column = 0, sticky="nesw")
 
-btn8 = Button(root, text =' Add Periodic Noise', anchor="w")
+btn8 = Button(root, text =' Add Periodic Noise', anchor="w", command = periodic)
 btn8.grid(row = 12, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 13)
