@@ -34,7 +34,7 @@ def openfilename():
     filename = filedialog.askopenfilename(title ='open')
     return filename
 
-def resize_img(image):
+def resize_img(image, should_retry=True):
     # resize the image and apply a high-quality down sampling filter
     width, height = image.size
     new_width = width
@@ -47,8 +47,11 @@ def resize_img(image):
         ratio = height / width
         new_width = 500
         new_height = int(ratio * new_width)
-    resizedImg = image.resize((new_width, new_height), Image.ANTIALIAS) 
-    return resizedImg
+    resizedImg = image.resize((new_width, new_height), Image.ANTIALIAS)
+    if should_retry:
+        return resize_img(resizedImg, should_retry=False) # re-attempt resizing in case both dimensions are too large
+    else:
+        return resizedImg
 
 def plt_to_img(bbox_inches=None, pad_inches=0.1, should_resize=True):
     img_data = BytesIO()
@@ -553,14 +556,14 @@ def mask():
     plt.imshow(magnitude_spectrum, cmap = 'gray')
     plt.axis('Off')
     image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
-    height = magnitude_spectrum.shape[1]
-    width = magnitude_spectrum.shape[0]
+    width = magnitude_spectrum.shape[1]
+    height = magnitude_spectrum.shape[0]
 
-    noise_filter = np.ones(shape=(width,height))
-    width_factor = magnitude_spectrum.shape[0] / image_from_plot.width()
-    height_factor = magnitude_spectrum.shape[1] / image_from_plot.height()
-    buffer_factor = 20
-    safety_factor = 5
+    noise_filter = np.ones(shape=(height,width))
+    width_factor = width / image_from_plot.width()
+    height_factor = height / image_from_plot.height()
+    buffer_factor = 10
+    safety_factor = 0
 
     global mask_coordinates
     x1 = int(mask_coordinates[0]['x'] * width_factor) + safety_factor
