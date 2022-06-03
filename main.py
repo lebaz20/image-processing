@@ -1,58 +1,34 @@
 
 
-from ast import Try
 from tkinter import *
-from skimage import data
-from skimage import color
 import matplotlib.pyplot as plt
-from skimage.transform import rescale, resize
-from scipy import ndimage
 import numpy as np
-from skimage import data, io
-from skimage.io import imread
-from matplotlib.pyplot import imshow, show, subplot, title, get_cmap
-from skimage.color import rgb2gray, gray2rgb, rgb2hsv, rgb2lab, lab2rgb
-from skimage import exposure
-from skimage.exposure import equalize_hist
 from skimage.util import random_noise
 from io import BytesIO
 # loading Python Imaging Library
 from PIL import ImageTk, Image, ImageOps
 # To get the dialog box to open when required
 from tkinter import filedialog
+# OpenCV
 import cv2
 
 def reset_plt():
     plt.figure().clear()
 
 def to_pil(image: np.ndarray) -> Image:
-    # return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    # return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    # return Image.fromarray(image)
-
     # convert from openCV2 to PIL. Notice the COLOR_BGR2RGB which means that 
     # the color is converted from BGR to RGB
-    # color_coverted = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # pil_image=Image.fromarray(color_coverted)
-    # return pil_image
-
     return Image.fromarray((image * 1).astype(np.uint8)).convert('RGB')
 
 def to_cv2(image: Image) -> np.ndarray:
-    # return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    # return cv2.cvtColor(numpy.array(img), cv2.COLOR_RGB2BGR)
-    # return np.asarray(image)
-
     # use numpy to convert the pil_image into a numpy array
     numpy_image=np.array(image)  
-
     # convert to a openCV2 image, notice the COLOR_RGB2BGR which means that 
     # the color is converted from RGB to BGR format
     opencv_image = cv2.cvtColor(numpy_image, cv2.COLOR_RGB2BGR)
     return opencv_image
 
 def openfilename():
- 
     # open file dialog box to select image
     # The dialogue box has a title "Open"
     filename = filedialog.askopenfilename(title ='"pen')
@@ -72,7 +48,22 @@ def resize_img(image):
     resizedImg = image.resize((new_width, new_height), Image.ANTIALIAS) 
     return resizedImg
 
+def plt_to_img(bbox_inches=None, pad_inches=0.1):
+    img_data = BytesIO()
+    plt.savefig(img_data, bbox_inches=bbox_inches, pad_inches=pad_inches)
+    reset_plt()
+    load = Image.open(img_data)
+    load = resize_img(load)
+    return ImageTk.PhotoImage(load)
+
 def open_img():
+    global panel_1
+    try:
+        panel_1.grid_remove()
+        print("panel_1 removed")
+    except:
+        print("panel_1 undefined")
+
     # Select the Imagename  from a folder
     global filename
     filename = openfilename()
@@ -81,194 +72,239 @@ def open_img():
     global img
     img = Image.open(filename)
 
+    # resize image
     resized_img = resize_img(img)
  
     # PhotoImage class is used to add image to widgets, icons etc
     tk_img = ImageTk.PhotoImage(resized_img)
   
-    global panel1
     # create a label
-    panel1 = Label(root, image = tk_img)
+    panel_1 = Label(root, image = tk_img)
      
     # set the image as img
-    panel1.image = tk_img
-    panel1.grid(row = 1, rowspan = 13, column = 1, padx=10)
+    panel_1.image = tk_img
+    panel_1.grid(row = 1, rowspan = 13, column = 1, padx=10)
 
 def original_histogram():
+    global original_hist_panel
+    try:
+        original_hist_panel.grid_remove()
+        print("original_hist_panel removed")
+    except:
+        print("original_hist_panel undefined")
+
     img_grey = ImageOps.grayscale(img)
     plt.hist(np.asarray(img_grey).ravel(),256,[0,256])
 
-    img_data = BytesIO()
-    plt.savefig(img_data)
-    reset_plt()
-    load = Image.open(img_data)
-    load = resize_img(load)
-    image_from_plot = ImageTk.PhotoImage(load)
+    image_from_plot = plt_to_img()
 
-    global panel2
     # create a label
-    panel2 = Label(root, image = image_from_plot)
+    original_hist_panel = Label(root, image = image_from_plot)
     # set the image as img
-    panel2.image = image_from_plot
-    panel2.grid(row = 1, rowspan = 13, column = 2, padx=10)
+    original_hist_panel.image = image_from_plot
+    original_hist_panel.grid(row = 1, rowspan = 13, column = 2, padx=10)
+
+def reset_original_histogram():
+    try:
+        original_hist_panel.grid_remove()
+        print("original_hist_panel removed")
+    except:
+        print("original_hist_panel undefined")
 
 def equalized_histogram():
-    img_equalized = ImageOps.equalize(img.convert('RGB'), mask = None)
+    global equalized_img_panel
+    try:
+        equalized_img_panel.grid_remove()
+        print("equalized_img_panel removed")
+    except:
+        print("equalized_img_panel undefined")
+    global equalized_hist_panel
+    try:
+        equalized_hist_panel.grid_remove()
+        print("equalized_hist_panel removed")
+    except:
+        print("equalized_hist_panel undefined")
 
+    img_equalized = ImageOps.equalize(img.convert('RGB'), mask = None)
     plt.hist(np.asarray(ImageOps.grayscale(img_equalized)).ravel(),256,[0,256])
    
     img_equalized = resize_img(img_equalized)
     img_equalized = ImageTk.PhotoImage(img_equalized)
-    global panel3
-    # create a label
-    panel3 = Label(root, image = img_equalized) 
-    # set the image as img
-    panel3.image = img_equalized
-    panel3.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
-    img_data = BytesIO()
-    plt.savefig(img_data)
-    reset_plt()
-    load = Image.open(img_data)
-    load = resize_img(load)
-    image_from_plot = ImageTk.PhotoImage(load)
-    global panel4
     # create a label
-    panel4 = Label(root, image = image_from_plot)
+    equalized_img_panel = Label(root, image = img_equalized) 
     # set the image as img
-    panel4.image = image_from_plot
-    panel4.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+    equalized_img_panel.image = img_equalized
+    equalized_img_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+
+    image_from_plot = plt_to_img()
+
+    # create a label
+    equalized_hist_panel = Label(root, image = image_from_plot)
+    # set the image as img
+    equalized_hist_panel.image = image_from_plot
+    equalized_hist_panel.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+
+def reset_equalized_histogram():
+    try:
+        equalized_img_panel.grid_remove()
+        print("equalized_img_panel removed")
+    except:
+        print("equalized_img_panel undefined")
+    try:
+        equalized_hist_panel.grid_remove()
+        print("equalized_hist_panel removed")
+    except:
+        print("equalized_hist_panel undefined")
 
 def init_sobel():
-    global sobelX
-    sobelX = IntVar()
-    global sobelXCheck
-    sobelXCheck = Checkbutton(root, text='X', variable=sobelX, onvalue=1, offvalue=0)
-    sobelXCheck.grid(row = 21, column = 0, sticky="nsw")
+    global sobel_x
+    sobel_x = IntVar()
+    global sobel_x_check
+    sobel_x_check = Checkbutton(root, text='X', variable=sobel_x, onvalue=1, offvalue=0)
+    sobel_x_check.grid(row = 21, column = 0, sticky="nsw")
 
-    global sobelY
-    sobelY = IntVar()
-    global sobelYCheck
-    sobelYCheck = Checkbutton(root, text='Y', variable=sobelY, onvalue=1, offvalue=0)
-    sobelYCheck.grid(row = 22, column = 0, sticky="nsw")
+    global sobel_y
+    sobel_y = IntVar()
+    global sobel_y_check
+    sobel_y_check = Checkbutton(root, text='Y', variable=sobel_y, onvalue=1, offvalue=0)
+    sobel_y_check.grid(row = 22, column = 0, sticky="nsw")
 
-    global sobelKLabel
-    sobelKLabel = Label(root, text='Kernel Size:')
-    sobelKLabel.grid(row = 23, column = 0, sticky="nsw")
-    global sobelK
-    sobelK = StringVar()
-    global sobelKEntry
-    sobelKEntry = Entry(root, textvariable=sobelK)
-    sobelKEntry.grid(row = 24, column = 0, sticky="nesw")
+    global sobel_k_label
+    sobel_k_label = Label(root, text='Kernel Size:')
+    sobel_k_label.grid(row = 23, column = 0, sticky="nsw")
+    global sobel_k
+    sobel_k = StringVar()
+    global sobel_k_entry
+    sobel_k_entry = Entry(root, textvariable=sobel_k)
+    sobel_k_entry.grid(row = 24, column = 0, sticky="nesw")
 
-    global sobelSubmit
-    sobelSubmit = Button(root, text =' Submit', anchor="w", command = sobel)
-    sobelSubmit.grid(row = 25, column = 0, sticky="nesw")
+    global sobel_submit
+    sobel_submit = Button(root, text =' Submit', anchor="w", command = sobel)
+    sobel_submit.grid(row = 25, column = 0, sticky="nesw")
 
 def sobel():
+    global sobel_panel
+    try:
+        sobel_panel.grid_remove()
+        print("sobel_panel removed")
+    except:
+        print("sobel_panel undefined")
+
     img_gray_cv = cv2.imread(filename, flags=0)
 
     # remove noise
     img_blur = cv2.GaussianBlur(img_gray_cv,(3,3), sigmaX=0, sigmaY=0)
 
-    cv2_sobel = cv2.Sobel(src=img_blur, ddepth=cv2.CV_32F, dx=sobelX.get(), dy=sobelY.get(), ksize=int(sobelK.get()))
+    cv2_sobel = cv2.Sobel(src=img_blur, ddepth=cv2.CV_32F, dx=sobel_x.get(), dy=sobel_y.get(), ksize=int(sobel_k.get()))
     img_sobel = resize_img(to_pil(cv2_sobel))
     img_sobel = ImageTk.PhotoImage(img_sobel)
-    # sobel_img = convert_from_cv2_to_image(sobel_cv2)
 
-    global sobelPanel
     # create a label
-    sobelPanel = Label(root, image = img_sobel) 
+    sobel_panel = Label(root, image = img_sobel) 
     # set the image as img
-    sobelPanel.image = img_sobel
-    sobelPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+    sobel_panel.image = img_sobel
+    sobel_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
 def reset_sobel():
     try:
-        sobelXCheck.grid_remove()
-        print("sobelXCheck removed")
+        sobel_x_check.grid_remove()
+        print("sobel_x_check removed")
     except:
-        print("sobelXCheck undefined")
+        print("sobel_x_check undefined")
     try:
-        sobelYCheck.grid_remove()
-        print("sobelYCheck removed")
+        sobel_y_check.grid_remove()
+        print("sobel_y_check removed")
     except:
-        print("sobelYCheck undefined")
+        print("sobel_y_check undefined")
     try:
-        sobelKLabel.grid_remove()
-        print("sobelKLabel removed")
+        sobel_k_label.grid_remove()
+        print("sobel_k_label removed")
     except:
-        print("sobelKLabel undefined")
+        print("sobel_k_label undefined")
     try:
-        sobelKEntry.grid_remove()
-        print("sobelKEntry removed")
+        sobel_k_entry.grid_remove()
+        print("sobel_k_entry removed")
     except:
-        print("sobelKEntry undefined")
+        print("sobel_k_entry undefined")
     try:
-        sobelSubmit.grid_remove()
-        print("sobelSubmit removed")
+        sobel_submit.grid_remove()
+        print("sobel_submit removed")
     except:
-        print("sobelSubmit undefined")
+        print("sobel_submit undefined")
     try:
-        sobelPanel.grid_remove()
-        print("sobelPanel removed")
+        sobel_panel.grid_remove()
+        print("sobel_panel removed")
     except:
-        print("sobelPanel undefined")
+        print("sobel_panel undefined")
 
 def init_laplace():
-    global laplaceKLabel
-    laplaceKLabel = Label(root, text='Kernel Size:')
-    laplaceKLabel.grid(row = 23, column = 0, sticky="nsw")
-    global laplaceK
-    laplaceK = StringVar()
-    global laplaceKEntry
-    laplaceKEntry = Entry(root, textvariable=laplaceK)
-    laplaceKEntry.grid(row = 24, column = 0, sticky="nesw")
+    global laplace_k_label
+    laplace_k_label = Label(root, text='Kernel Size:')
+    laplace_k_label.grid(row = 23, column = 0, sticky="nsw")
+    global laplace_k
+    laplace_k = StringVar()
+    global laplace_k_entry
+    laplace_k_entry = Entry(root, textvariable=laplace_k)
+    laplace_k_entry.grid(row = 24, column = 0, sticky="nesw")
 
-    global laplaceSubmit
-    laplaceSubmit = Button(root, text =' Submit', anchor="w", command = laplace)
-    laplaceSubmit.grid(row = 25, column = 0, sticky="nesw")
+    global laplace_submit
+    laplace_submit = Button(root, text =' Submit', anchor="w", command = laplace)
+    laplace_submit.grid(row = 25, column = 0, sticky="nesw")
 
 def laplace():
+    global laplace_panel
+    try:
+        laplace_panel.grid_remove()
+        print("laplace_panel removed")
+    except:
+        print("laplace_panel undefined")
+
     img_gray_cv = cv2.imread(filename, flags=0)
 
     # remove noise
     img_blur = cv2.GaussianBlur(img_gray_cv,(3,3), sigmaX=0, sigmaY=0)
 
-    cv2_laplace = cv2.Laplacian(src=img_blur, ddepth=cv2.CV_32F, ksize=int(laplaceK.get()))
+    cv2_laplace = cv2.Laplacian(src=img_blur, ddepth=cv2.CV_32F, ksize=int(laplace_k.get()))
     img_laplace = resize_img(to_pil(cv2_laplace))
     img_laplace = ImageTk.PhotoImage(img_laplace)
 
-    global laplacePanel
     # create a label
-    laplacePanel = Label(root, image = img_laplace) 
+    laplace_panel = Label(root, image = img_laplace) 
     # set the image as img
-    laplacePanel.image = img_laplace
-    laplacePanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+    laplace_panel.image = img_laplace
+    laplace_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
 def reset_laplace():
     try:
-        laplaceKLabel.grid_remove()
-        print("laplaceKLabel removed")
+        laplace_k_label.grid_remove()
+        print("laplace_k_label removed")
     except:
-        print("laplaceKLabel undefined")
+        print("laplace_k_label undefined")
     try:
-        laplaceKEntry.grid_remove()
-        print("laplaceKEntry removed")
+        laplace_k_entry.grid_remove()
+        print("laplace_k_entry removed")
     except:
-        print("laplaceKEntry undefined")
+        print("laplace_k_entry undefined")
     try:
-        laplaceSubmit.grid_remove()
-        print("laplaceSubmit removed")
+        laplace_submit.grid_remove()
+        print("laplace_submit removed")
     except:
-        print("laplaceSubmit undefined")
+        print("laplace_submit undefined")
     try:
-        laplacePanel.grid_remove()
-        print("laplacePanel removed")
+        laplace_panel.grid_remove()
+        print("laplace_panel removed")
     except:
-        print("laplacePanel undefined")
+        print("laplace_panel undefined")
 
 def fourier_transform():
+    global fourier_panel
+    try:
+        fourier_panel.grid_remove()
+        print("fourier_panel removed")
+    except:
+        print("fourier_panel undefined")
+
     img_gray_cv = cv2.imread(filename, flags=0)
 
     f = np.fft.fft2(img_gray_cv)
@@ -276,142 +312,184 @@ def fourier_transform():
     magnitude_spectrum = 20*np.log(np.abs(fshift))
 
     plt.imshow(magnitude_spectrum, cmap = 'gray')
-    img_data = BytesIO()
-    plt.savefig(img_data)
-    reset_plt()
-    load = Image.open(img_data)
-    load = resize_img(load)
-    image_from_plot = ImageTk.PhotoImage(load)
+    image_from_plot = plt_to_img()
 
-    global fourierPanel
     # create a label
-    fourierPanel = Label(root, image = image_from_plot) 
+    fourier_panel = Label(root, image = image_from_plot) 
     # set the image as img
-    fourierPanel.image = image_from_plot
-    fourierPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+    fourier_panel.image = image_from_plot
+    fourier_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
 def reset_fourier():
     try:
-        fourierPanel.grid_remove()
-        print("fourierPanel removed")
+        fourier_panel.grid_remove()
+        print("fourier_panel removed")
     except:
-        print("fourierPanel undefined")
+        print("fourier_panel undefined")
 
 def init_salt_pepper():
-    global saltALabel
-    saltALabel = Label(root, text='Amount:')
-    saltALabel.grid(row = 23, column = 0, sticky="nsw")
-    global saltA
-    saltA = StringVar()
-    global saltAEntry
-    saltAEntry = Entry(root, textvariable=saltA)
-    saltAEntry.grid(row = 24, column = 0, sticky="nesw")
+    reset_median()
 
-    global saltSubmit
-    saltSubmit = Button(root, text =' Submit', anchor="w", command = salt_pepper)
-    saltSubmit.grid(row = 25, column = 0, sticky="nesw")
+    global salt_a_label
+    salt_a_label = Label(root, text='Amount:')
+    salt_a_label.grid(row = 23, column = 0, sticky="nsw")
+    global salt_a
+    salt_a = StringVar()
+    global salt_a_entry
+    salt_a_entry = Entry(root, textvariable=salt_a)
+    salt_a_entry.grid(row = 24, column = 0, sticky="nesw")
+
+    global salt_submit
+    salt_submit = Button(root, text =' Submit', anchor="w", command = salt_pepper)
+    salt_submit.grid(row = 25, column = 0, sticky="nesw")
 
 def salt_pepper():
+    global salt_panel
+    try:
+        salt_panel.grid_remove()
+        print("salt_panel removed")
+    except:
+        print("salt_panel undefined")
+
     image = plt.imread(filename)
-    img_noise = random_noise(image, mode='s&p',amount=float(saltA.get()))
-    img_noise = np.array(255*img_noise, dtype = 'uint8')
+    global img_noise_salt
+    img_noise_salt = random_noise(image, mode='s&p',amount=float(salt_a.get()))
+    img_noise_salt = np.array(255*img_noise_salt, dtype = 'uint8')
 
-    plt.imshow(img_noise)
+    plt.imshow(img_noise_salt)
     plt.axis('Off')
-    img_data = BytesIO()
-    plt.savefig(img_data, bbox_inches='tight', pad_inches=0)
-    reset_plt()
-    load = Image.open(img_data)
-    load = resize_img(load)
-    image_from_plot = ImageTk.PhotoImage(load)
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
 
-    global saltPanel
     # create a label
-    saltPanel = Label(root, image = image_from_plot) 
+    salt_panel = Label(root, image = image_from_plot) 
     # set the image as img
-    saltPanel.image = image_from_plot
-    saltPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+    salt_panel.image = image_from_plot
+    salt_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
-def reset_salt():
+def reset_salt(with_panel=True):
     try:
-        saltALabel.grid_remove()
-        print("saltALabel removed")
+        salt_a_label.grid_remove()
+        print("salt_a_label removed")
     except:
-        print("saltALabel undefined")
+        print("salt_a_label undefined")
     try:
-        saltAEntry.grid_remove()
-        print("saltAEntry removed")
+        salt_a_entry.grid_remove()
+        print("salt_a_entry removed")
     except:
-        print("saltAEntry undefined")
+        print("salt_a_entry undefined")
     try:
-        saltSubmit.grid_remove()
-        print("saltSubmit removed")
+        salt_submit.grid_remove()
+        print("salt_submit removed")
     except:
-        print("saltSubmit undefined")
-    try:
-        saltPanel.grid_remove()
-        print("saltPanel removed")
-    except:
-        print("saltPanel undefined")
+        print("salt_submit undefined")
+    if with_panel:
+        try:
+            salt_panel.grid_remove()
+            print("salt_panel removed")
+        except:
+            print("salt_panel undefined")
 
 def periodic():
+    global periodic_panel
+    try:
+        periodic_panel.grid_remove()
+        print("periodic_panel removed")
+    except:
+        print("periodic_panel undefined")
+
     image = cv2.imread(filename, flags=0)
     shape = image.shape[0], image.shape[1]
     x,y = np.meshgrid(range(0,shape[1]), range(0, shape[0]))
     s= 1+np.sin(x+y/1.5)
-    img_noise= ((image) / 128 + s)/4
+    global img_noise_periodic
+    img_noise_periodic= ((image) / 128 + s)/4
 
-    plt.imshow(img_noise, cmap="gray")
+    plt.imshow(img_noise_periodic, cmap="gray")
     plt.axis('Off')
-    img_data = BytesIO()
-    plt.savefig(img_data, bbox_inches='tight', pad_inches=0)
-    reset_plt()
-    load = Image.open(img_data)
-    load = resize_img(load)
-    image_from_plot = ImageTk.PhotoImage(load)
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
 
-    global periodicPanel
     # create a label
-    periodicPanel = Label(root, image = image_from_plot) 
+    periodic_panel = Label(root, image = image_from_plot) 
     # set the image as img
-    periodicPanel.image = image_from_plot
-    periodicPanel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
+    periodic_panel.image = image_from_plot
+    periodic_panel.grid(row = 14, rowspan = 13, column = 1, padx=10, pady=10)
 
 def reset_periodic():
     try:
-        periodicPanel.grid_remove()
-        print("periodicPanel removed")
+        periodic_panel.grid_remove()
+        print("periodic_panel removed")
     except:
-        print("periodicPanel undefined")
+        print("periodic_panel undefined")
+
+def init_median():
+    reset_salt(with_panel=False)
+
+    global median_k_label
+    median_k_label = Label(root, text='Kernel Size:')
+    median_k_label.grid(row = 23, column = 0, sticky="nsw")
+    global median_k
+    median_k = StringVar()
+    global median_k_entry
+    median_k_entry = Entry(root, textvariable=median_k)
+    median_k_entry.grid(row = 24, column = 0, sticky="nesw")
+
+    global median_submit
+    median_submit = Button(root, text =' Submit', anchor="w", command = median)
+    median_submit.grid(row = 25, column = 0, sticky="nesw")
+
+def median():
+    global median_panel
+    try:
+        median_panel.grid_remove()
+        print("median_panel removed")
+    except:
+        print("median_panel undefined")
+
+    global img_noise_salt
+    img_cv = cv2.cvtColor(img_noise_salt, cv2.COLOR_RGB2BGR)
+
+    cv2_median = cv2.medianBlur(src=img_cv, ksize=int(median_k.get()))
+    cv2_median = cv2.cvtColor(cv2_median, cv2.COLOR_BGR2RGB)
+    img_median = resize_img(to_pil(cv2_median))
+    img_median = ImageTk.PhotoImage(img_median)
+
+    # create a label
+    median_panel = Label(root, image = img_median) 
+    # set the image as img
+    median_panel.image = img_median
+    median_panel.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+
+def reset_median():
+    try:
+        median_k_label.grid_remove()
+        print("median_k_label removed")
+    except:
+        print("median_k_label undefined")
+    try:
+        median_k_entry.grid_remove()
+        print("median_k_entry removed")
+    except:
+        print("median_k_entry undefined")
+    try:
+        median_submit.grid_remove()
+        print("median_submit removed")
+    except:
+        print("median_submit undefined")
+    try:
+        median_panel.grid_remove()
+        print("median_panel removed")
+    except:
+        print("median_panel undefined")
 
 def reset():
-    try:
-        panel1.grid_remove()
-        print("panel1 removed")
-    except:
-        print("panel1 undefined")
-    try:
-        panel2.grid_remove()
-        print("panel2 removed")
-    except:
-        print("panel2 undefined")
-    try:
-        panel3.grid_remove()
-        print("panel3 removed")
-    except:
-        print("panel3 undefined")
-    try:
-        panel4.grid_remove()
-        print("panel4 removed")
-    except:
-        print("panel4 undefined")
-    
+    reset_original_histogram()    
+    reset_equalized_histogram()    
     reset_sobel()
     reset_laplace()
     reset_fourier()
     reset_salt()
     reset_periodic()
-
+    reset_median()
 
 # Create a window
 root = Tk()
@@ -463,7 +541,7 @@ btn8.grid(row = 12, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 13)
 
-btn9 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w")
+btn9 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w", command = init_median)
 btn9.grid(row = 14, column = 0, sticky="nesw")
 
 btn10 = Button(root, text =' Remove Periodic Noise By Mask', anchor="w")
