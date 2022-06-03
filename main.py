@@ -31,38 +31,41 @@ def to_cv2(image: Image) -> np.ndarray:
 def openfilename():
     # open file dialog box to select image
     # The dialogue box has a title "Open"
-    filename = filedialog.askopenfilename(title ='"pen')
+    filename = filedialog.askopenfilename(title ='open')
     return filename
 
 def resize_img(image):
     # resize the image and apply a high-quality down sampling filter
     width, height = image.size
+    new_width = width
+    new_height = height
     if height > 400:
         new_height = 300
         ratio = width / height
         new_width = int(ratio * new_height)
-    else :
+    elif width > 500:
         ratio = height / width
         new_width = 500
         new_height = int(ratio * new_width)
     resizedImg = image.resize((new_width, new_height), Image.ANTIALIAS) 
     return resizedImg
 
-def plt_to_img(bbox_inches=None, pad_inches=0.1):
+def plt_to_img(bbox_inches=None, pad_inches=0.1, should_resize=True):
     img_data = BytesIO()
     plt.savefig(img_data, bbox_inches=bbox_inches, pad_inches=pad_inches)
     reset_plt()
     load = Image.open(img_data)
-    load = resize_img(load)
+    # if should_resize:
+    #     load = resize_img(load)
     return ImageTk.PhotoImage(load)
 
 def open_img():
-    global panel_1
+    global original_img_panel
     try:
-        panel_1.grid_remove()
-        print("panel_1 removed")
+        original_img_panel.grid_remove()
+        print("original_img_panel removed")
     except:
-        print("panel_1 undefined")
+        print("original_img_panel undefined")
 
     # Select the Imagename  from a folder
     global filename
@@ -79,11 +82,11 @@ def open_img():
     tk_img = ImageTk.PhotoImage(resized_img)
   
     # create a label
-    panel_1 = Label(root, image = tk_img)
+    original_img_panel = Label(root, image = tk_img)
      
     # set the image as img
-    panel_1.image = tk_img
-    panel_1.grid(row = 1, rowspan = 13, column = 1, padx=10)
+    original_img_panel.image = tk_img
+    original_img_panel.grid(row = 1, rowspan = 13, column = 1, padx=10)
 
 def original_histogram():
     global original_hist_panel
@@ -481,6 +484,155 @@ def reset_median():
     except:
         print("median_panel undefined")
 
+def mask_onclick_callback(event):
+    global mask_coordinates
+    global mask_fourier_panel
+    if len(mask_coordinates) == 2:
+        mask_coordinates = []
+        mask_fourier_panel.delete("coordinates")
+        
+    mask_coordinates.append({'x': event.x, 'y': event.y})
+
+    mask_fourier_panel.create_rectangle(event.x - 5, event.y - 5, event.x + 5 , event.y + 5, outline="red", tags="coordinates")
+    mask_fourier_panel.create_text(event.x - 5, event.y - 25, text=f'({event.x}, {event.y})', anchor=NW, fill='red', tags="coordinates")
+
+def init_mask():
+    global mask_coordinates
+    mask_coordinates = []
+
+    global mask_fourier_panel
+    try:
+        mask_fourier_panel.grid_remove()
+        print("mask_fourier_panel removed")
+    except:
+        print("mask_fourier_panel undefined")
+
+    f = np.fft.fft2(img_noise_periodic)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = 20*np.log(np.abs(fshift))
+
+    plt.imshow(magnitude_spectrum, cmap = 'gray')
+    plt.axis('Off')
+    root.image_from_plot = image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
+    height = image_from_plot.height()
+    width = image_from_plot.width()
+
+    # create a label
+    mask_fourier_panel = Canvas(root, width=width, height=height)
+    mask_fourier_panel.grid(row = 1, rowspan = 13, column = 2, padx=10)
+    # set the image as img
+    mask_fourier_panel.bind("<Button-1>", mask_onclick_callback)
+    mask_fourier_panel.create_image(0, 0, anchor=NW, image=image_from_plot)
+
+    global mask_submit
+    mask_submit = Button(root, text =' Submit', anchor="w", command = mask)
+    mask_submit.grid(row = 25, column = 0, sticky="nesw")
+
+def mask():
+    global mask_panel
+    try:
+        mask_panel.grid_remove()
+        print("mask_panel removed")
+    except:
+        print("mask_panel undefined")
+
+    #the additive noise could be removed without blurring the image
+    #notice that the added noise is consistent, thus can be removed in freq domain
+    #by blacking out the noise frequency
+
+    #get image in frequency domain
+    global img_noise_salt
+    f = np.fft.fft2(img_noise_periodic)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = 20*np.log(np.abs(fshift))
+    
+    #blacking out the 4 noise components resulted from the sine wave
+    #this was done easily by observing the image in frequency domain
+    #notice the four bright white dots surrounding the center of the image
+    
+    plt.imshow(magnitude_spectrum, cmap = 'gray')
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
+    height = magnitude_spectrum.shape[1]
+    width = magnitude_spectrum.shape[0]
+
+    noise_filter = np.ones(shape=(width,height))
+    width_factor = magnitude_spectrum.shape[0] / image_from_plot.width()
+    height_factor = magnitude_spectrum.shape[1] / image_from_plot.height()
+    buffer_factor = 20
+    safety_factor = 5
+
+    global mask_coordinates
+    x1 = int(mask_coordinates[0]['x'] * width_factor) + safety_factor
+    x1min = x1 - buffer_factor
+    x1max = x1 + buffer_factor
+    x2 = int(mask_coordinates[1]['x'] * width_factor) + safety_factor
+    x2min = x2 - buffer_factor
+    x2max = x2 + buffer_factor
+    y1 = int(mask_coordinates[0]['y'] * height_factor) - safety_factor
+    y1min = y1 - buffer_factor
+    y1max = y1 + buffer_factor
+    y2 = int(mask_coordinates[1]['y'] * height_factor) - safety_factor
+    y2min = y2 - buffer_factor
+    y2max = y2 + buffer_factor
+
+    noise_filter[y1min:y1max, x1min:x1max] = 0
+    noise_filter[y2min:y2max, x1min:x1max] = 0
+    noise_filter[y1min:y1max, x2min:x2max] = 0
+    noise_filter[y2min:y2max, x2min:x2max] = 0
+
+    denoised_image = np.fft.ifft2(np.fft.fftshift(fshift*noise_filter))
+    denoised_image_mag=np.abs(denoised_image)
+    freq_denoised_mag=20*np.log(np.abs(fshift))*noise_filter
+
+    plt.imshow(denoised_image_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    # create a label
+    mask_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    mask_panel.image = image_from_plot
+    mask_panel.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+
+    plt.imshow(freq_denoised_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    global mask_denoised_fourier_panel
+    try:
+        mask_denoised_fourier_panel.grid_remove()
+        print("mask_denoised_fourier_panel removed")
+    except:
+        print("mask_denoised_fourier_panel undefined")
+    # create a label
+    mask_denoised_fourier_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    mask_denoised_fourier_panel.image = image_from_plot
+    mask_denoised_fourier_panel.grid(row = 1, rowspan = 13, column = 3, padx=10)
+
+def reset_mask():
+    try:
+        mask_fourier_panel.grid_remove()
+        print("mask_fourier_panel removed")
+    except:
+        print("mask_fourier_panel undefined")
+    try:
+        mask_submit.grid_remove()
+        print("mask_submit removed")
+    except:
+        print("mask_submit undefined")
+    try:
+        mask_panel.grid_remove()
+        print("mask_panel removed")
+    except:
+        print("mask_panel undefined")
+    try:
+        mask_denoised_fourier_panel.grid_remove()
+        print("mask_denoised_fourier_panel removed")
+    except:
+        print("mask_denoised_fourier_panel undefined")
+
 def reset():
     reset_original_histogram()    
     reset_equalized_histogram()    
@@ -490,6 +642,7 @@ def reset():
     reset_salt()
     reset_periodic()
     reset_median()
+    reset_mask()
 
 # Create a window
 root = Tk()
@@ -499,7 +652,7 @@ root.columnconfigure(0, minsize=300)
 root.title("Image Processing")
  
 # Set the resolution of window
-root.geometry("1400x900+300+150")
+root.geometry("1600x900+100+150")
  
 # Allow Window to be resizable
 root.resizable(width = True, height = True)
@@ -536,15 +689,15 @@ Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 10)
 btn7 = Button(root, text =' Add Salt And Pepper Noise', anchor="w", command = init_salt_pepper)
 btn7.grid(row = 11, column = 0, sticky="nesw")
 
-btn8 = Button(root, text =' Add Periodic Noise', anchor="w", command = periodic)
+btn8 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w", command = init_median)
 btn8.grid(row = 12, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 13)
 
-btn9 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w", command = init_median)
+btn9 = Button(root, text =' Add Periodic Noise', anchor="w", command = periodic)
 btn9.grid(row = 14, column = 0, sticky="nesw")
 
-btn10 = Button(root, text =' Remove Periodic Noise By Mask', anchor="w")
+btn10 = Button(root, text =' Remove Periodic Noise By Mask', anchor="w", command = init_mask)
 btn10.grid(row = 15, column = 0, sticky="nesw")
 
 btn11 = Button(root, text =' Remove Periodic Noise By Notch', anchor="w")
