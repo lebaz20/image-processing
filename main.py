@@ -541,7 +541,7 @@ def mask():
     #by blacking out the noise frequency
 
     #get image in frequency domain
-    global img_noise_salt
+    global img_noise_periodic
     f = np.fft.fft2(img_noise_periodic)
     fshift = np.fft.fftshift(f)
     magnitude_spectrum = 20*np.log(np.abs(fshift))
@@ -633,6 +633,100 @@ def reset_mask():
     except:
         print("mask_denoised_fourier_panel undefined")
 
+def high_pass_filter(img, size):#Transfer parameters are Fourier transform spectrogram and filter size
+    h, w = img.shape[0:2]#Getting image properties
+    h1,w1 = int(h/2), int(w/2)#Find the center point of the Fourier spectrum
+    img[h1-int(size/2):h1+int(size/2), w1-int(size/2):w1+int(size/2)] = 0#Center point plus or minus half of the filter size, forming a filter size that defines the size, then set to 0
+    return img
+
+def low_pass_filter(img, size):#Transfer parameters are Fourier transform spectrogram and filter size
+    h, w = img.shape[0:2]#Getting image properties
+    h1,w1 = int(h/2), int(w/2)#Find the center point of the Fourier spectrum
+    img2 = np.zeros((h, w), np.uint8)#Define a blank black image with the same size as the Fourier Transform Transfer
+    img2[h1-int(size/2):h1+int(size/2), w1-int(size/2):w1+int(size/2)] = 1#Center point plus or minus half of the filter size, forming a filter size that defines the size, then set to 1, preserving the low frequency part
+    img3=img2*img #A low-pass filter is obtained by multiplying the defined low-pass filter with the incoming Fourier spectrogram one-to-one.
+    return img3
+
+def band_reject_filter(img, min_size, max_size):
+    h = img.shape[0]
+    w = img.shape[1]
+    h1,w1 = int(h/2), int(w/2)#Find the center point of the Fourier spectrum
+    low_pass = np.zeros((h, w), np.uint8)
+    low_pass[h1-int(max_size/2):h1+int(max_size/2), w1-int(max_size/2):w1+int(max_size/2)] = 1
+    high_pass = np.ones((h, w), np.uint8)
+    high_pass[h1-int(min_size/2):h1+int(min_size/2), w1-int(min_size/2):w1+int(min_size/2)] = 0
+    return np.ones((h, w), np.uint8) - low_pass*high_pass
+
+
+def band_reject():
+    global band_reject_panel
+    try:
+        band_reject_panel.grid_remove()
+        print("band_reject_panel removed")
+    except:
+        print("band_reject_panel undefined")
+
+    global img_noise_periodic
+    f = np.fft.fft2(img_noise_periodic)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = 20*np.log(np.abs(fshift))
+    
+    plt.imshow(magnitude_spectrum, cmap = 'gray')
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
+    width = magnitude_spectrum.shape[1]
+
+    min_size = int(width / 3 - 15)
+    max_size = int(width / 3 + 15)
+    noise_filter = band_reject_filter(magnitude_spectrum, min_size, max_size)
+
+    denoised_image = np.fft.ifft2(np.fft.fftshift(fshift*noise_filter))
+    denoised_image_mag=np.abs(denoised_image)
+    freq_denoised_mag=20*np.log(np.abs(fshift))*noise_filter
+
+    plt.imshow(denoised_image_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    # create a label
+    band_reject_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    band_reject_panel.image = image_from_plot
+    band_reject_panel.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+
+    plt.imshow(freq_denoised_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    global band_reject_denoised_fourier_panel
+    try:
+        band_reject_denoised_fourier_panel.grid_remove()
+        print("band_reject_denoised_fourier_panel removed")
+    except:
+        print("band_reject_denoised_fourier_panel undefined")
+    # create a label
+    band_reject_denoised_fourier_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    band_reject_denoised_fourier_panel.image = image_from_plot
+    band_reject_denoised_fourier_panel.grid(row = 1, rowspan = 13, column = 2, padx=10)
+
+def reset_band_reject():
+    try:
+        band_reject_fourier_panel.grid_remove()
+        print("band_reject_fourier_panel removed")
+    except:
+        print("band_reject_fourier_panel undefined")
+    try:
+        band_reject_panel.grid_remove()
+        print("band_reject_panel removed")
+    except:
+        print("band_reject_panel undefined")
+    try:
+        band_reject_denoised_fourier_panel.grid_remove()
+        print("band_reject_denoised_fourier_panel removed")
+    except:
+        print("band_reject_denoised_fourier_panel undefined")
+
 def reset():
     reset_original_histogram()    
     reset_equalized_histogram()    
@@ -643,6 +737,7 @@ def reset():
     reset_periodic()
     reset_median()
     reset_mask()
+    reset_band_reject()
 
 # Create a window
 root = Tk()
@@ -703,7 +798,7 @@ btn10.grid(row = 15, column = 0, sticky="nesw")
 btn11 = Button(root, text =' Remove Periodic Noise By Notch', anchor="w")
 btn11.grid(row = 16, column = 0, sticky="nesw")
 
-btn12 = Button(root, text =' Remove Periodic Noise By Band-Reject', anchor="w")
+btn12 = Button(root, text =' Remove Periodic Noise By Band-Reject', anchor="w", command = band_reject)
 btn12.grid(row = 17, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 18)
