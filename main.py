@@ -55,8 +55,8 @@ def plt_to_img(bbox_inches=None, pad_inches=0.1, should_resize=True):
     plt.savefig(img_data, bbox_inches=bbox_inches, pad_inches=pad_inches)
     reset_plt()
     load = Image.open(img_data)
-    # if should_resize:
-    #     load = resize_img(load)
+    if should_resize:
+        load = resize_img(load)
     return ImageTk.PhotoImage(load)
 
 def open_img():
