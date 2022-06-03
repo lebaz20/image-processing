@@ -720,11 +720,6 @@ def band_reject():
 
 def reset_band_reject():
     try:
-        band_reject_fourier_panel.grid_remove()
-        print("band_reject_fourier_panel removed")
-    except:
-        print("band_reject_fourier_panel undefined")
-    try:
         band_reject_panel.grid_remove()
         print("band_reject_panel removed")
     except:
@@ -734,6 +729,82 @@ def reset_band_reject():
         print("band_reject_denoised_fourier_panel removed")
     except:
         print("band_reject_denoised_fourier_panel undefined")
+
+def notch_filter(spectrum, buffer_factor):
+    h = spectrum.shape[0]
+    w = spectrum.shape[1]
+    #blacking out the 4 noise components resulted from the periodic noise (four bright white dots surrounding the center of the image)
+    noise_filter = np.ones(shape=(h,w))
+    noise_filter[:, int((spectrum.shape[1]/1.55)):int((spectrum.shape[1]/1.55)+buffer_factor)] = 0
+    noise_filter[:, int((spectrum.shape[1]/3)):int(((spectrum.shape[1]/3)+buffer_factor))] = 0
+    noise_filter[int((spectrum.shape[0]/2.65)):int((spectrum.shape[0]/2.65)+buffer_factor),: ] = 0
+    noise_filter[int((spectrum.shape[0]/1.65)):int((spectrum.shape[0]/1.65)+buffer_factor),:] = 0
+    return noise_filter
+
+def notch():
+    global notch_panel
+    try:
+        notch_panel.grid_remove()
+        print("notch_panel removed")
+    except:
+        print("notch_panel undefined")
+
+    global img_noise_periodic
+    f = np.fft.fft2(img_noise_periodic)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = 20*np.log(np.abs(fshift))
+    
+    plt.imshow(magnitude_spectrum, cmap = 'gray')
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
+    width = magnitude_spectrum.shape[1]
+
+    buffer_factor = 10
+    if width > 1000:
+        buffer_factor = 20
+    noise_filter = notch_filter(magnitude_spectrum, buffer_factor)
+
+    denoised_image = np.fft.ifft2(np.fft.fftshift(fshift*noise_filter))
+    denoised_image_mag=np.abs(denoised_image)
+    freq_denoised_mag=20*np.log(np.abs(fshift))*noise_filter
+
+    plt.imshow(denoised_image_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    # create a label
+    notch_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    notch_panel.image = image_from_plot
+    notch_panel.grid(row = 14, rowspan = 13, column = 2, padx=10, pady=10)
+
+    plt.imshow(freq_denoised_mag, cmap="gray")
+    plt.axis('Off')
+    image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
+
+    global notch_denoised_fourier_panel
+    try:
+        notch_denoised_fourier_panel.grid_remove()
+        print("notch_denoised_fourier_panel removed")
+    except:
+        print("notch_denoised_fourier_panel undefined")
+    # create a label
+    notch_denoised_fourier_panel = Label(root, image = image_from_plot) 
+    # set the image as img
+    notch_denoised_fourier_panel.image = image_from_plot
+    notch_denoised_fourier_panel.grid(row = 1, rowspan = 13, column = 2, padx=10)
+
+def reset_notch():
+    try:
+        notch_panel.grid_remove()
+        print("notch_panel removed")
+    except:
+        print("notch_panel undefined")
+    try:
+        notch_denoised_fourier_panel.grid_remove()
+        print("notch_denoised_fourier_panel removed")
+    except:
+        print("notch_denoised_fourier_panel undefined")
 
 def reset():
     reset_original_histogram()    
@@ -746,6 +817,7 @@ def reset():
     reset_median()
     reset_mask()
     reset_band_reject()
+    reset_notch()
 
 # Create a window
 root = Tk()
@@ -803,7 +875,7 @@ btn9.grid(row = 14, column = 0, sticky="nesw")
 btn10 = Button(root, text =' Remove Periodic Noise By Mask', anchor="w", command = init_mask)
 btn10.grid(row = 15, column = 0, sticky="nesw")
 
-btn11 = Button(root, text =' Remove Periodic Noise By Notch', anchor="w")
+btn11 = Button(root, text =' Remove Periodic Noise By Notch', anchor="w", command = notch)
 btn11.grid(row = 16, column = 0, sticky="nesw")
 
 btn12 = Button(root, text =' Remove Periodic Noise By Band-Reject', anchor="w", command = band_reject)
