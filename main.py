@@ -563,6 +563,8 @@ def mask():
     width_factor = width / image_from_plot.width()
     height_factor = height / image_from_plot.height()
     buffer_factor = 10
+    if width > 1000:
+        buffer_factor = 20
     safety_factor = 0
 
     global mask_coordinates
@@ -679,8 +681,11 @@ def band_reject():
     image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
     width = magnitude_spectrum.shape[1]
 
-    min_size = int(width / 3 - 15)
-    max_size = int(width / 3 + 15)
+    buffer_factor = 15
+    if width > 1000:
+        buffer_factor = 30
+    min_size = int(width / 3 - buffer_factor)
+    max_size = int(width / 3 + buffer_factor)
     noise_filter = band_reject_filter(magnitude_spectrum, min_size, max_size)
 
     denoised_image = np.fft.ifft2(np.fft.fftshift(fshift*noise_filter))
