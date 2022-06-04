@@ -100,8 +100,10 @@ def original_histogram():
         print("original_hist_panel undefined")
 
     img_grey = ImageOps.grayscale(img)
-    plt.hist(np.asarray(img_grey).ravel(),256,[0,256])
-
+    plt.hist(np.asarray(img_grey).ravel(),256,[0,255])
+    plt.title("Grayscale Histogram")
+    plt.xlabel("grayscale value")
+    plt.ylabel("number of pixels")
     image_from_plot = plt_to_img()
 
     # create a label
@@ -131,9 +133,11 @@ def equalized_histogram():
     except:
         print("equalized_hist_panel undefined")
 
-    img_equalized = ImageOps.equalize(img.convert('RGB'), mask = None)
-    plt.hist(np.asarray(ImageOps.grayscale(img_equalized)).ravel(),256,[0,256])
-   
+    img_equalized = ImageOps.equalize(img.convert('L'), mask = None)
+    plt.hist(np.asarray(ImageOps.grayscale(img_equalized)).ravel(),256,[0,255])
+    plt.title("Equalized Grayscale Histogram")
+    plt.xlabel("grayscale value")
+    plt.ylabel("number of pixels")
     img_equalized = resize_img(img_equalized)
     img_equalized = ImageTk.PhotoImage(img_equalized)
 
@@ -345,10 +349,24 @@ def init_salt_pepper():
     salt_a_entry = Entry(root, textvariable=salt_a)
     salt_a_entry.grid(row = 24, column = 0, sticky="nesw")
 
+    global salt_ratio_label
+    salt_ratio_label = Label(root, text='Salt vs Pepper Ratio:')
+    salt_ratio_label.grid(row = 25, column = 0, sticky="nsw")
+    global salt_ratio
+    salt_ratio = StringVar()
+    global salt_ratio_entry
+    salt_ratio_entry = Entry(root, textvariable=salt_ratio)
+    salt_ratio_entry.grid(row = 26, column = 0, sticky="nesw")
+
     global salt_submit
     salt_submit = Button(root, text =' Submit', anchor="w", command = salt_pepper)
-    salt_submit.grid(row = 25, column = 0, sticky="nesw")
+    salt_submit.grid(row = 27, column = 0, sticky="nesw")
 
+#This function adds salt and pepper noise to image
+#input: image and noise amount
+#output: original image & image after adding salt and pepper noise
+#amount float: Proportion of image pixels to replace with noise on range [0, 1]. Default : 0.05
+#salt_to_pepper: float Proportion of salt vs. pepper noise on range [0, 1]. Higher values represent more salt. Default : 0.5 (equal amounts)
 def salt_pepper():
     global salt_panel
     try:
@@ -357,12 +375,12 @@ def salt_pepper():
     except:
         print("salt_panel undefined")
 
-    image = plt.imread(filename)
+    image = np.array(Image.open(filename).convert("L"))
     global img_noise_salt
-    img_noise_salt = random_noise(image, mode='s&p',amount=float(salt_a.get()))
+    img_noise_salt = random_noise(image, mode='s&p',amount=float(salt_a.get()),salt_vs_pepper=float(salt_ratio.get()))
     img_noise_salt = np.array(255*img_noise_salt, dtype = 'uint8')
 
-    plt.imshow(img_noise_salt)
+    plt.imshow(img_noise_salt, cmap="gray")
     plt.axis('Off')
     image_from_plot = plt_to_img(bbox_inches='tight', pad_inches=0)
 
@@ -383,6 +401,16 @@ def reset_salt(with_panel=True):
         print("salt_a_entry removed")
     except:
         print("salt_a_entry undefined")
+    try:
+        salt_ratio_label.grid_remove()
+        print("salt_ratio_label removed")
+    except:
+        print("salt_ratio_label undefined")
+    try:
+        salt_ratio_entry.grid_remove()
+        print("salt_ratio_entry removed")
+    except:
+        print("salt_ratio_entry undefined")
     try:
         salt_submit.grid_remove()
         print("salt_submit removed")
@@ -443,6 +471,12 @@ def init_median():
     median_submit = Button(root, text =' Submit', anchor="w", command = median)
     median_submit.grid(row = 25, column = 0, sticky="nesw")
 
+#This function applies median filter to image
+#The median filter uses BORDER_REPLICATE internally to cope with border pixels
+#input: image and kernel size
+#Kernel size must be odd and greater than 1, for example: 3, 5, 7 ...
+#output: input image & image after applying median filter
+#source:https://towardsdatascience.com/image-filters-in-python-26ee938e57d2#:~:text=Median%20Filter,the%20mean%20and%20Gaussian%20filters.
 def median():
     global median_panel
     try:
@@ -455,7 +489,7 @@ def median():
     img_cv = cv2.cvtColor(img_noise_salt, cv2.COLOR_RGB2BGR)
 
     cv2_median = cv2.medianBlur(src=img_cv, ksize=int(median_k.get()))
-    cv2_median = cv2.cvtColor(cv2_median, cv2.COLOR_BGR2RGB)
+    cv2_median = cv2.cvtColor(cv2_median, cv2.COLOR_BGR2GRAY)
     img_median = resize_img(to_pil(cv2_median))
     img_median = ImageTk.PhotoImage(img_median)
 
@@ -652,7 +686,7 @@ def low_pass_filter(img, size):#Transfer parameters are Fourier transform spectr
     img3=img2*img #A low-pass filter is obtained by multiplying the defined low-pass filter with the incoming Fourier spectrogram one-to-one.
     return img3
 
-def band_reject_filter(img, min_size, max_size):
+def band_reject_square_filter(img, min_size, max_size):
     h = img.shape[0]
     w = img.shape[1]
     h1,w1 = int(h/2), int(w/2)#Find the center point of the Fourier spectrum
@@ -662,6 +696,19 @@ def band_reject_filter(img, min_size, max_size):
     high_pass[h1-int(min_size/2):h1+int(min_size/2), w1-int(min_size/2):w1+int(min_size/2)] = 0
     return np.ones((h, w), np.uint8) - low_pass*high_pass
 
+def band_reject_circular_filter(img, min_size, max_size):
+    h = img.shape[0]
+    w = img.shape[1]
+    h1,w1 = int(h/2), int(w/2)#Find the center point of the Fourier spectrum
+    center = (w1, h1)
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    low_pass = dist_from_center <= max_size / 2 
+    high_pass = dist_from_center >= min_size / 2
+
+    return np.ones((h, w), np.uint8) - low_pass*high_pass
 
 def band_reject():
     global band_reject_panel
@@ -681,12 +728,13 @@ def band_reject():
     image_from_plot = plt_to_img(bbox_inches="tight", pad_inches=0, should_resize=False)
     width = magnitude_spectrum.shape[1]
 
+    safety_factor = 15
     buffer_factor = 15
     if width > 1000:
         buffer_factor = 30
-    min_size = int(width / 3 - buffer_factor)
-    max_size = int(width / 3 + buffer_factor)
-    noise_filter = band_reject_filter(magnitude_spectrum, min_size, max_size)
+    min_size = int(width / 3 - buffer_factor + safety_factor)
+    max_size = int(width / 3 + buffer_factor + safety_factor)
+    noise_filter = band_reject_circular_filter(magnitude_spectrum, min_size, max_size)
 
     denoised_image = np.fft.ifft2(np.fft.fftshift(fshift*noise_filter))
     denoised_image_mag=np.abs(denoised_image)
@@ -856,18 +904,19 @@ btn5.grid(row = 7, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 8)
 
-btn6 = Button(root, text =' Apply Fourier Transform', anchor="w", command = fourier_transform)
+btn6 = Button(root, text =' Add Salt And Pepper Noise', anchor="w", command = init_salt_pepper)
 btn6.grid(row = 9, column = 0, sticky="nesw")
 
-Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 10)
+btn7 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w", command = init_median)
+btn7.grid(row = 10, column = 0, sticky="nesw")
 
-btn7 = Button(root, text =' Add Salt And Pepper Noise', anchor="w", command = init_salt_pepper)
-btn7.grid(row = 11, column = 0, sticky="nesw")
+Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 11)
 
-btn8 = Button(root, text =' Remove Salt And Pepper Noise By Median', anchor="w", command = init_median)
+btn8 = Button(root, text =' Apply Fourier Transform', anchor="w", command = fourier_transform)
 btn8.grid(row = 12, column = 0, sticky="nesw")
 
 Frame(root, width=300, height=sepFrameHeight).grid(column=0, row = 13)
+
 
 btn9 = Button(root, text =' Add Periodic Noise', anchor="w", command = periodic)
 btn9.grid(row = 14, column = 0, sticky="nesw")
